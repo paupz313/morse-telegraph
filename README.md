@@ -1,11 +1,44 @@
-# Morse Telegraph
+# Morse Telegraph 📟
 
-Send a Telegram message, hear it beeped out in Morse code on a device across the
-room. Tap the device's button back, and your Morse arrives in Telegram as plain
-readable text.
+```
+.-- .... .- -   .... .- - ....   --. --- -..   .-- .-. --- ..- --. .... -
+```
+*"What hath God wrought", the first long-distance Morse message, sent in 1844. This repo is the 2026 sequel.*
 
-Three pieces, built in that order, each one kept here because each one answers a
-different question.
+Send a Telegram message from your phone, and a little cube across the living room beeps it out in Morse code. Tap the cube back, and your dots and dashes land in Telegram as plain text. Your friend reads `HELLO`, not `.... . .-.. .-.. ---`.
+
+It is completely useless. That is the point.
+
+---
+
+## Why build this?
+
+Every notification today is the same buzz and the same banner. The idea: a nice object for nerds that sits in the living room and taps out your incoming messages like a 19th-century telegraph office. A sound in the room instead of a banner on a screen.
+
+I had never built any hardware before. So the rule from day one was: **prove it's fun before making it pretty.** No casing, no soldering, no shopping list. Just: can a message become a beep, and does hearing it make you smile?
+
+## How it got here (the thought process)
+
+Each step answered exactly one question, and each one is kept in this repo because of that.
+
+**Plan A: the stuff already on the desk.** A Raspberry Pi and a synthesizer with a USB MIDI port. The Pi would read messages and play them as notes on the synth. Zero purchases. Then the Pi turned out to have no Wi-Fi antenna and no way to plug it into the network. Plan A was over.
+
+**Plan B: the Mac.** Everything moved to the laptop. A Python script polls a Telegram bot and plays the Morse through the Mac's speakers. *Question answered: can a message become sound?* Yes: it beeped `HI` on the first run. Fun, confirmed.
+
+**Why Telegram and not WhatsApp?** The long-term wish list includes WhatsApp, Signal and Discord. But Telegram is the one with a free, open bot API you can talk to in ten lines of code. Start where the door is open.
+
+**Plan C: the browser.** A single HTML file that plays the same Morse with no install. *Question answered: can other people hear it without owning anything?* Yes, which makes it easy to show the idea to anyone.
+
+**Plan D: leave the computer.** The first two versions need a computer awake with a terminal open. That's not an object, that's a chore. Enter the **M5Stack ATOM Echo**: a 2 cm cube, about €17, with a speaker, an LED and a button for a whole top face. Nothing to solder. Plug it into any USB charger and it *is* the telegraph. And because it has a button, it can also *send*: the button became a telegraph key.
+
+**Decisions along the way, and why:**
+- **Same Morse timing in all three versions**, ported symbol for symbol. If the cube sounds different from the prototype, you're debugging two things at once.
+- **No Wi-Fi password or token in the code.** The cube opens its own setup page on first boot. That's what made it safe to publish this repo.
+- **Typing timing separate from playback timing.** A machine plays dots at 150 ms; a human thumb absolutely does not. The key is deliberately more forgiving.
+- **Two processor cores, two jobs.** One core waits on Telegram (up to 20 s at a time), the other listens to your thumb. Otherwise the key would freeze every time the network thought about things.
+- **Skip what Morse can't say.** Accents, emoji and punctuation are dropped in silence rather than guessed at. Morse predates the 🎉.
+
+## What's in the box
 
 | | what it is | what it proved |
 |---|---|---|
@@ -13,13 +46,9 @@ different question.
 | [`web/`](web/) | single HTML file, Web Audio, no install | that other people can hear it without owning anything |
 | [`firmware/`](firmware/) | Arduino sketch for an M5Stack ATOM Echo | that it can leave the computer entirely |
 
-The interesting one is the firmware. The first two need a computer sitting there,
-awake, with a terminal open. The Atom Echo is a 2 cm cube that costs about €17,
-plugs into any USB charger, and is the whole telegraph.
-
 ---
 
-## The Morse itself
+## The Morse itself (same everywhere, on purpose)
 
 Identical in all three, and deliberately so — the web and firmware versions were
 ported symbol-for-symbol from the Python, not rewritten.
@@ -43,7 +72,7 @@ silence rather than guessed at.
 
 ---
 
-## Running the prototype
+## Running the Mac prototype
 
 Needs Python 3 and a Telegram bot token from
 [BotFather](https://t.me/botfather).
@@ -73,7 +102,7 @@ sound, so the first press is the one that unlocks audio.
 
 ---
 
-## The hardware version
+## The hardware version 🧊
 
 An **M5Stack ATOM Echo** — ESP32 with an I2S speaker, an RGB LED, and a button
 that is the entire top face. Nothing to solder.
@@ -151,7 +180,7 @@ no human keys to 150 ms precision, and the two jobs want different tolerances.
 
 ---
 
-## One bot cannot drive two devices
+## The wall: one bot cannot drive two devices
 
 This is the architectural wall worth knowing before you build a second one.
 
@@ -164,7 +193,14 @@ So this design is deliberately **one bot, one device, yours**. Fanning out to
 friends needs a server in the middle that polls Telegram once and republishes to
 each device over something like MQTT, with per-device pairing. That isn't here.
 
+## What's next
+
+- **A proper casing.** Step two, now that the fun is proven: wood, brass, something that deserves a shelf. Ideally made and assembled in France, with a nod to the heritage of the telegraph.
+- **More messengers.** WhatsApp, Signal, Discord, not just Telegram.
+- **Telegraphs for friends.** Needs the bridge server described above, so several cubes can share messages.
+
 ## Licence
 
-None yet, which legally means all rights reserved. Add one if you want others to
-be able to use this.
+None yet, which legally means all rights reserved. Add one if you want others to be able to use this.
+
+`...-.-` (end of work)
