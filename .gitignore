@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Arduino build output
+build/
+*.bin
+*.elf
+*.map
+
+# macOS
+.DS_Store
+
+# Never commit a filled-in token
+*.local.py
+secrets.*

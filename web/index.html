@@ -1,0 +1,840 @@
+<title>Morse Telegraph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+
+<style>
+  /* ---------- tokens: light is the base, both themes defined at token level ---------- */
+  :root {
+    --bg:        #e5e6e4;
+    --surface:   #f1f2f0;
+    --surface-2: #dcdedb;
+    --ink:       #1a1d1c;
+    --muted:     #6a716e;
+    --rule:      #c5c8c4;
+    --brass:     #a87517;
+    --brass-lit: #c08c22;
+    --verdigris: #2f6e66;
+    --mark-idle: #bcc0bc;
+    --shadow:    rgba(20, 28, 25, .16);
+    --glow:      rgba(168, 117, 23, .30);
+
+    --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --f-body:    "Newsreader", Georgia, "Times New Roman", serif;
+    --f-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #131614;
+      --surface:   #1b1f1d;
+      --surface-2: #232825;
+      --ink:       #e7e8e5;
+      --muted:     #8b928e;
+      --rule:      #2f3531;
+      --brass:     #d9a33f;
+      --brass-lit: #f0be5c;
+      --verdigris: #56a89c;
+      --mark-idle: #333a36;
+      --shadow:    rgba(0, 0, 0, .5);
+      --glow:      rgba(217, 163, 63, .34);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #131614;
+    --surface:   #1b1f1d;
+    --surface-2: #232825;
+    --ink:       #e7e8e5;
+    --muted:     #8b928e;
+    --rule:      #2f3531;
+    --brass:     #d9a33f;
+    --brass-lit: #f0be5c;
+    --verdigris: #56a89c;
+    --mark-idle: #333a36;
+    --shadow:    rgba(0, 0, 0, .5);
+    --glow:      rgba(217, 163, 63, .34);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead { display: flex; flex-direction: column; gap: 14px; }
+
+  .wordmark {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: clamp(38px, 8vw, 62px);
+    line-height: .92;
+    letter-spacing: -.035em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .wordmark .em { color: var(--brass); }
+
+  .thesis {
+    max-width: 58ch;
+    margin: 0;
+    color: var(--muted);
+    font-size: 18px;
+  }
+
+  .rule-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--muted);
+  }
+  .rule-row::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- the tape ---------- */
+  .register {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: 0 1px 3px var(--shadow);
+    overflow: hidden;
+  }
+
+  .tape-window {
+    position: relative;
+    height: 132px;
+    overflow: hidden;
+  }
+
+  /* the telegraph line the marks sit on */
+  .tape-window::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    top: 66px;
+    height: 1px;
+    background: var(--rule);
+    z-index: 0;
+  }
+
+  .playhead {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: var(--brass);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .playhead::before {
+    content: "";
+    position: absolute;
+    top: 10px; left: -3.5px;
+    width: 8px; height: 8px;
+    background: var(--brass);
+    border-radius: 50%;
+  }
+
+  .strip {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    will-change: transform;
+    z-index: 1;
+  }
+
+  .mark {
+    position: absolute;
+    top: 56px;
+    height: 21px;
+    border-radius: 2px;
+    background: var(--mark-idle);
+    transition: background-color .09s linear, box-shadow .09s linear;
+  }
+  .mark.done { background: var(--verdigris); }
+  .mark.live {
+    background: var(--brass-lit);
+    box-shadow: 0 0 0 3px var(--glow), 0 0 16px var(--glow);
+  }
+
+  .glyph {
+    position: absolute;
+    top: 24px;
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--muted);
+    text-align: center;
+    transition: color .09s linear;
+  }
+  .glyph.done { color: var(--verdigris); }
+  .glyph.live { color: var(--brass-lit); }
+
+  .code {
+    position: absolute;
+    top: 88px;
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .readout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 14px;
+    border-top: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .readout .state { color: var(--ink); }
+  .readout .state.sending { color: var(--brass); }
+  .lamp {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--mark-idle);
+    margin-right: 8px;
+    vertical-align: baseline;
+  }
+  .lamp.on { background: var(--brass-lit); box-shadow: 0 0 9px var(--glow); }
+
+  /* ---------- composer ---------- */
+  .composer { display: flex; flex-direction: column; gap: 16px; }
+
+  textarea {
+    width: 100%;
+    min-height: 92px;
+    resize: vertical;
+    padding: 15px 16px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    font-family: var(--f-mono);
+    font-size: 15px;
+    line-height: 1.55;
+    letter-spacing: .02em;
+  }
+  textarea:focus-visible,
+  button:focus-visible,
+  input[type="range"]:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+
+  .keys { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+
+  button {
+    font-family: var(--f-display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 0 18px;
+    height: 44px;
+    cursor: pointer;
+    transition: transform .06s ease, background-color .14s ease, border-color .14s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .42; cursor: not-allowed; }
+
+  /* the key itself — the one loud object on the page */
+  .send {
+    flex: 1 1 220px;
+    background: var(--brass);
+    border-color: var(--brass);
+    color: #14110a;
+    font-weight: 800;
+    letter-spacing: .16em;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 1px 3px var(--shadow);
+  }
+  .send:hover:not(:disabled) { background: var(--brass-lit); border-color: var(--brass-lit); }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip {
+    height: 30px;
+    padding: 0 11px;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .1em;
+    background: transparent;
+    color: var(--muted);
+  }
+  .chip:hover:not(:disabled) { color: var(--ink); }
+
+  /* ---------- dials ---------- */
+  .dials {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 22px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+  }
+  .dial { display: flex; flex-direction: column; gap: 8px; }
+  .dial-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .dial-head .val { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 22px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--rule);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 2px;
+    background: var(--rule);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px; height: 15px;
+    margin-top: -6.5px;
+    border-radius: 50%;
+    background: var(--brass);
+    border: none;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: var(--brass);
+    border: none;
+  }
+
+  /* ---------- share ---------- */
+  .share {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border: 1px dashed var(--rule);
+    border-radius: 3px;
+  }
+  .share p { margin: 0; flex: 1 1 260px; font-size: 15px; color: var(--muted); }
+
+  /* ---------- reference ---------- */
+  .ref-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .ref-cell {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 9px 11px;
+    background: var(--surface);
+    font-family: var(--f-mono);
+    font-size: 13px;
+  }
+  .ref-cell b { font-weight: 600; color: var(--ink); width: 1ch; }
+  .ref-cell span { color: var(--verdigris); letter-spacing: .06em; }
+
+  .note {
+    margin: 0;
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+  .note code {
+    font-family: var(--f-mono);
+    font-size: .88em;
+    color: var(--ink);
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  section { display: flex; flex-direction: column; gap: 16px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mark, .glyph, button { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <h1 class="wordmark">Morse<br><span class="em">Telegraph</span></h1>
+    <p class="thesis">
+      Type a message and hear it sounded out the way it crossed a wire in 1844 — short mark,
+      long mark, silence. The tape below is the signal itself: every bar is exactly as wide
+      as the tone is long.
+    </p>
+  </header>
+
+  <section>
+    <div class="rule-row"><span class="eyebrow">Register</span></div>
+
+    <div class="register">
+      <div class="tape-window" id="window">
+        <div class="strip" id="strip"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+      <div class="readout">
+        <span><span class="lamp" id="lamp"></span><span class="state" id="state">Ready</span></span>
+        <span id="meter">&mdash;</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="composer">
+    <div class="rule-row"><span class="eyebrow">Message</span></div>
+
+    <textarea id="input" spellcheck="false" aria-label="Message to send in Morse code">HELLO FROM THE WIRE</textarea>
+
+    <div class="presets">
+      <button class="chip" data-preset="SOS">SOS</button>
+      <button class="chip" data-preset="HI">HI</button>
+      <button class="chip" data-preset="WHAT HATH GOD WROUGHT">FIRST MESSAGE 1844</button>
+      <button class="chip" data-preset="CQD DE MGY">TITANIC 1912</button>
+    </div>
+
+    <div class="keys">
+      <button class="send" id="send">Send</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="rule-row"><span class="eyebrow">Line settings</span></div>
+
+    <div class="dials">
+      <div class="dial">
+        <label class="dial-head" for="pitch">
+          <span>Pitch</span><span class="val"><span id="pitchVal">600</span> Hz</span>
+        </label>
+        <input type="range" id="pitch" min="300" max="1200" step="10" value="600">
+      </div>
+      <div class="dial">
+        <label class="dial-head" for="speed">
+          <span>Dot length</span><span class="val"><span id="speedVal">0.15</span> s</span>
+        </label>
+        <input type="range" id="speed" min="50" max="300" step="5" value="150">
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="share">
+      <p>Every message lives in the link. Copy it and whoever opens it hears the same thing.</p>
+      <button id="copy">Copy link</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="rule-row"><span class="eyebrow">Alphabet</span></div>
+    <div class="ref-grid" id="ref"></div>
+    <p class="note">
+      Letters and digits only. Punctuation and emoji are skipped in silence rather than
+      guessed at &mdash; <code>/start</code> sounds out as <code>START</code>. A space is a
+      full word gap: seven dot-lengths of nothing.
+    </p>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MORSE = {
+    A: ".-",    B: "-...",  C: "-.-.",  D: "-..",
+    E: ".",     F: "..-.",  G: "--.",   H: "....",
+    I: "..",    J: ".---",  K: "-.-",   L: ".-..",
+    M: "--",    N: "-.",    O: "---",   P: ".--.",
+    Q: "--.-",  R: ".-.",   S: "...",   T: "-",
+    U: "..-",   V: "...-",  W: ".--",   X: "-..-",
+    Y: "-.--",  Z: "--..",
+    0: "-----", 1: ".----", 2: "..---", 3: "...--",
+    4: "....-", 5: ".....", 6: "-....", 7: "--...",
+    8: "---..", 9: "----."
+  };
+
+  // One dot is the unit. Dash = 3, symbol gap = 1, letter gap = 3, word gap = 7.
+  var UNITS = { dash: 3, symbolGap: 1, letterGap: 3, wordGap: 7 };
+  var PX_PER_UNIT = 27;   // tape scale, held constant so speed changes scroll rate not size
+  var FADE = 0.01;        // 10 ms edge ramp, same trick the Python script uses to kill clicks
+  var AMP = 0.4;
+
+  var el = {
+    strip:    document.getElementById("strip"),
+    window:   document.getElementById("window"),
+    playhead: document.getElementById("playhead"),
+    input:    document.getElementById("input"),
+    send:     document.getElementById("send"),
+    stop:     document.getElementById("stop"),
+    state:    document.getElementById("state"),
+    meter:    document.getElementById("meter"),
+    lamp:     document.getElementById("lamp"),
+    pitch:    document.getElementById("pitch"),
+    speed:    document.getElementById("speed"),
+    pitchVal: document.getElementById("pitchVal"),
+    speedVal: document.getElementById("speedVal"),
+    copy:     document.getElementById("copy"),
+    ref:      document.getElementById("ref")
+  };
+
+  var ctx = null, voices = [], raf = 0;
+  var plan = null, playing = false, startedAt = 0, headX = 0;
+
+  function plural(n) { return n + (n === 1 ? " character" : " characters"); }
+
+  function dot()   { return Number(el.speed.value) / 1000; }
+  function freq()  { return Number(el.pitch.value); }
+
+  /* ---------- build the timeline ---------- */
+
+  function build(text, unit) {
+    var marks = [], glyphs = [], t = 0, i, j;
+    var chars = text.toUpperCase().split("");
+
+    for (i = 0; i < chars.length; i++) {
+      var ch = chars[i];
+
+      if (ch === " " || ch === "\n" || ch === "\t") {
+        // a letter gap was already appended; top it up to a full word gap
+        if (marks.length) t += (UNITS.wordGap - UNITS.letterGap) * unit;
+        continue;
+      }
+
+      var code = MORSE[ch];
+      if (!code) continue;               // skipped in silence, like the Python version
+
+      var from = t;
+      for (j = 0; j < code.length; j++) {
+        var dur = (code[j] === "-" ? UNITS.dash : 1) * unit;
+        marks.push({ t0: t, dur: dur });
+        t += dur;
+        if (j < code.length - 1) t += UNITS.symbolGap * unit;
+      }
+      glyphs.push({ ch: ch, code: code, t0: from, t1: t });
+      t += UNITS.letterGap * unit;
+    }
+
+    if (marks.length) t -= UNITS.letterGap * unit;   // no trailing gap
+    return { marks: marks, glyphs: glyphs, total: Math.max(t, 0), unit: unit };
+  }
+
+  /* ---------- draw it ---------- */
+
+  function render(p) {
+    var pps = PX_PER_UNIT / p.unit;      // px per second
+    var frag = document.createDocumentFragment();
+    var k;
+
+    for (k = 0; k < p.marks.length; k++) {
+      var m = p.marks[k];
+      var bar = document.createElement("div");
+      bar.className = "mark";
+      bar.style.left  = (m.t0 * pps) + "px";
+      bar.style.width = (m.dur * pps) + "px";
+      m.node = bar;
+      frag.appendChild(bar);
+    }
+
+    for (k = 0; k < p.glyphs.length; k++) {
+      var g = p.glyphs[k];
+      var left = g.t0 * pps, width = (g.t1 - g.t0) * pps;
+
+      var lab = document.createElement("div");
+      lab.className = "glyph";
+      lab.style.left = left + "px";
+      lab.style.width = width + "px";
+      lab.textContent = g.ch;
+      g.node = lab;
+      frag.appendChild(lab);
+
+      var cd = document.createElement("div");
+      cd.className = "code";
+      cd.style.left = left + "px";
+      cd.style.width = width + "px";
+      cd.textContent = g.code;
+      frag.appendChild(cd);
+    }
+
+    el.strip.innerHTML = "";
+    el.strip.appendChild(frag);
+    el.strip.style.width = (p.total * pps) + "px";
+
+    headX = Math.round(el.window.clientWidth * 0.28);
+    el.playhead.style.left = headX + "px";
+    seek(0);
+  }
+
+  function seek(elapsed) {
+    if (!plan) return;
+    var pps = PX_PER_UNIT / plan.unit;
+    el.strip.style.transform = "translateX(" + (headX - elapsed * pps) + "px)";
+
+    var k, m, g;
+    for (k = 0; k < plan.marks.length; k++) {
+      m = plan.marks[k];
+      var live = playing && elapsed >= m.t0 && elapsed < m.t0 + m.dur;
+      m.node.className = "mark" + (live ? " live" : (elapsed >= m.t0 + m.dur ? " done" : ""));
+    }
+    for (k = 0; k < plan.glyphs.length; k++) {
+      g = plan.glyphs[k];
+      var on = playing && elapsed >= g.t0 && elapsed < g.t1;
+      g.node.className = "glyph" + (on ? " live" : (elapsed >= g.t1 ? " done" : ""));
+    }
+  }
+
+  /* ---------- sound ---------- */
+
+  function schedule(p, t0) {
+    var f = freq(), k;
+    for (k = 0; k < p.marks.length; k++) {
+      var m = p.marks[k];
+      var a = t0 + m.t0, b = a + m.dur;
+      var ramp = Math.min(FADE, m.dur / 2);
+
+      var osc = ctx.createOscillator();
+      var amp = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = f;
+
+      amp.gain.setValueAtTime(0, a);
+      amp.gain.linearRampToValueAtTime(AMP, a + ramp);
+      amp.gain.setValueAtTime(AMP, b - ramp);
+      amp.gain.linearRampToValueAtTime(0, b);
+
+      osc.connect(amp).connect(ctx.destination);
+      osc.start(a);
+      osc.stop(b + 0.02);
+      voices.push(osc);
+    }
+  }
+
+  function tick() {
+    if (!playing) return;
+    var elapsed = ctx.currentTime - startedAt;
+
+    if (elapsed >= plan.total) {
+      seek(plan.total);
+      finish("Sent");
+      return;
+    }
+
+    seek(Math.max(elapsed, 0));
+
+    var live = false, k;
+    for (k = 0; k < plan.marks.length; k++) {
+      if (elapsed >= plan.marks[k].t0 && elapsed < plan.marks[k].t0 + plan.marks[k].dur) {
+        live = true;
+        break;
+      }
+    }
+    el.lamp.className = "lamp" + (live ? " on" : "");
+
+    var done = 0;
+    for (k = 0; k < plan.glyphs.length; k++) if (elapsed >= plan.glyphs[k].t1) done++;
+    el.meter.textContent = Math.min(done + 1, plan.glyphs.length) + " / " + plan.glyphs.length +
+                           " · " + Math.max(plan.total - elapsed, 0).toFixed(1) + "s left";
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  function finish(word) {
+    playing = false;
+    cancelAnimationFrame(raf);
+    voices = [];
+    el.send.disabled = false;
+    el.stop.disabled = true;
+    el.state.textContent = word;
+    el.state.className = "state";
+    el.lamp.className = "lamp";
+    el.meter.textContent = plan && plan.glyphs.length
+      ? plural(plan.glyphs.length) + " · " + plan.total.toFixed(1) + "s"
+      : "—";
+  }
+
+  function send() {
+    var text = el.input.value;
+    var p = build(text, dot());
+
+    if (!p.marks.length) {
+      plan = null;
+      el.strip.innerHTML = "";
+      el.state.textContent = "Nothing to send";
+      el.meter.textContent = "letters and digits only";
+      return;
+    }
+
+    stopAll();
+    plan = p;
+    render(p);
+
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
+
+    startedAt = ctx.currentTime + 0.12;   // small lead so the first tone isn't clipped
+    schedule(p, startedAt);
+
+    playing = true;
+    el.send.disabled = true;
+    el.stop.disabled = false;
+    el.state.textContent = "Sending";
+    el.state.className = "state sending";
+    raf = requestAnimationFrame(tick);
+  }
+
+  function stopAll() {
+    for (var k = 0; k < voices.length; k++) {
+      try { voices[k].stop(); } catch (e) { /* already stopped */ }
+    }
+    voices = [];
+    if (playing) finish("Stopped");
+  }
+
+  /* ---------- preview without sound, so the tape is never empty ---------- */
+
+  function preview() {
+    if (playing) return;
+    var p = build(el.input.value, dot());
+    plan = p.marks.length ? p : null;
+    if (!plan) {
+      el.strip.innerHTML = "";
+      el.meter.textContent = "letters and digits only";
+      return;
+    }
+    render(p);
+    el.meter.textContent = plural(p.glyphs.length) + " · " + p.total.toFixed(1) + "s";
+  }
+
+  /* ---------- wiring ---------- */
+
+  el.send.addEventListener("click", send);
+  el.stop.addEventListener("click", stopAll);
+
+  el.input.addEventListener("input", preview);
+
+  el.pitch.addEventListener("input", function () {
+    el.pitchVal.textContent = el.pitch.value;
+  });
+  el.speed.addEventListener("input", function () {
+    el.speedVal.textContent = dot().toFixed(2);
+    preview();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.addEventListener("click", function () {
+      el.input.value = b.getAttribute("data-preset");
+      preview();
+      send();
+    });
+  });
+
+  el.copy.addEventListener("click", function () {
+    var url = location.origin + location.pathname +
+              "#m=" + encodeURIComponent(el.input.value.trim());
+    var done = function () {
+      el.copy.textContent = "Copied";
+      setTimeout(function () { el.copy.textContent = "Copy link"; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () {
+        window.prompt("Copy this link:", url);
+      });
+    } else {
+      window.prompt("Copy this link:", url);
+    }
+  });
+
+  window.addEventListener("resize", function () {
+    if (plan) {
+      headX = Math.round(el.window.clientWidth * 0.28);
+      el.playhead.style.left = headX + "px";
+      if (!playing) seek(0);
+    }
+  });
+
+  // alphabet reference
+  (function () {
+    var frag = document.createDocumentFragment();
+    Object.keys(MORSE).forEach(function (key) {
+      var cell = document.createElement("div");
+      cell.className = "ref-cell";
+      var b = document.createElement("b");
+      b.textContent = key;
+      var s = document.createElement("span");
+      s.textContent = MORSE[key];
+      cell.appendChild(b);
+      cell.appendChild(s);
+      frag.appendChild(cell);
+    });
+    el.ref.appendChild(frag);
+  })();
+
+  // a shared link carries its message in the hash
+  (function () {
+    var m = /[#&]m=([^&]*)/.exec(location.hash);
+    if (m) {
+      try { el.input.value = decodeURIComponent(m[1]); } catch (e) { /* keep default */ }
+    }
+    preview();
+  })();
+})();
+</script>
